@@ -1,0 +1,41 @@
+version: "3.8"
+
+services:
+  auth:
+    build:
+      context: ../.. 
+      dockerfile: infra/docker/Dockerfile.auth
+    env_file:
+      - ../../infra/docker/.env.docker
+    ports:
+      - "3002:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - ams-net
+
+  db:
+    image: postgres:15-alpine
+    container_name: ams-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ila
+      POSTGRES_PASSWORD: ilango@@2005
+      POSTGRES_DB: ams_auth
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - ams-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ila -d ams_auth"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db_data:
+
+networks:
+  ams-net:
+    driver: bridge
