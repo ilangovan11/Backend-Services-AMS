@@ -17,6 +17,7 @@ const healthRoutes = require('./routes/health.routes');
   try {
     if (process.env.DB_TYPE === 'mongodb') {
       await connectMongoDB();
+      logger.info('✅ MongoDB connected');
     } else if (process.env.DB_TYPE === 'postgres' && sequelize) {
       await sequelize.sync({ alter: true });
       logger.info('✅ Sequelize sync completed');
@@ -45,9 +46,11 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('combined', { stream: { write: msg => logger.info(msg.trim()) } }));
 }
 
+// ROUTES
 app.use('/api/auth', authRoutes);
-app.use('/', healthRoutes);
+app.use('/api/health', healthRoutes); // ✅ fixed mounting
 
+// 404 & Error Handling
 app.use(notFound);
 app.use(errorHandler);
 

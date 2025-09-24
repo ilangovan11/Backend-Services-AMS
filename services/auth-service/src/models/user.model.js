@@ -23,13 +23,9 @@ if (process.env.DB_TYPE === 'mongodb') {
 
   userSchema.pre('save', async function(next) {
     if (!this.isModified('password')) return next();
-    try {
-      const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_SALT_ROUNDS || 10));
-      this.password = await bcrypt.hash(this.password, salt);
-      next();
-    } catch (err) {
-      next(err);
-    }
+    const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_SALT_ROUNDS || 10));
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
   });
 
   userSchema.methods.comparePassword = async function(candidatePassword) {
@@ -45,45 +41,41 @@ if (process.env.DB_TYPE === 'mongodb') {
 
 } else if (process.env.DB_TYPE === 'postgres') {
   const { DataTypes, Model } = require('sequelize');
-  const { sequelize } = require('../config/db'); // ✅ correct Sequelize instance
+  const { sequelize } = require('../config/db');
 
   class SequelizeUser extends Model {}
 
-  if (sequelize) {
-    SequelizeUser.init({
-      id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
-      name: { type: DataTypes.STRING, allowNull: false },
-      email: { type: DataTypes.STRING, allowNull: false, unique: true, validate: { isEmail: true } },
-      password: { type: DataTypes.STRING, allowNull: false },
-      role: { type: DataTypes.STRING, allowNull: false, defaultValue: 'user' },
-      isVerified: { type: DataTypes.BOOLEAN, defaultValue: false }
-    }, {
-      sequelize,
-      modelName: 'User',
-      tableName: 'users',
-      timestamps: true,
-      hooks: {
-        beforeCreate: async (user) => {
+  SequelizeUser.init({
+    id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    name: { type: DataTypes.STRING, allowNull: false },
+    email: { type: DataTypes.STRING, allowNull: false, unique: true, validate: { isEmail: true } },
+    password: { type: DataTypes.STRING, allowNull: false },
+    role: { type: DataTypes.STRING, allowNull: false, defaultValue: 'user' },
+    isVerified: { type: DataTypes.BOOLEAN, defaultValue: false }
+  }, {
+    sequelize,
+    modelName: 'User',
+    tableName: 'users',
+    timestamps: true,
+    hooks: {
+      beforeCreate: async (user) => {
+        const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_SALT_ROUNDS || 10));
+        user.password = await bcrypt.hash(user.password, salt);
+      },
+      beforeUpdate: async (user) => {
+        if (user.changed('password')) {
           const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_SALT_ROUNDS || 10));
           user.password = await bcrypt.hash(user.password, salt);
-        },
-        beforeUpdate: async (user) => {
-          if (user.changed('password')) {
-            const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_SALT_ROUNDS || 10));
-            user.password = await bcrypt.hash(user.password, salt);
-          }
         }
       }
-    });
+    }
+  });
 
-    SequelizeUser.prototype.comparePassword = async function(candidatePassword) {
-      return await bcrypt.compare(candidatePassword, this.password);
-    };
+  SequelizeUser.prototype.comparePassword = async function(candidatePassword) {
+    return await bcrypt.compare(candidatePassword, this.password);
+  };
 
-    User = SequelizeUser;
-  } else {
-    throw new Error('Sequelize instance is undefined. Check DB_TYPE and db.js configuration.');
-  }
+  User = SequelizeUser;
 }
 
 module.exports = User;
